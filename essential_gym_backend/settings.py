@@ -42,7 +42,7 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '5/minute',  # Limitar intentos de login
+        'anon': '5/minute',  
         'user': '100/minute',
     }
 }
@@ -74,7 +74,9 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    'gym',
     'users',
+    'training',
 ]
 
 MIDDLEWARE = [

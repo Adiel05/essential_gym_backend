@@ -15,6 +15,9 @@ from .models import CustomUser
 import logging
 import re
 
+from rest_framework.permissions import IsAuthenticated
+from .serializers import UserProfileSerializer
+
 logger = logging.getLogger(__name__)
 
 class LoginThrottle(AnonRateThrottle):
@@ -27,7 +30,7 @@ def login_view(request):
     username = request.data.get('username')
     password = request.data.get('password')
     
-    # Validar que llegaron los campos
+    
     if not username or not password:
         return Response(
             {'error': 'Usuario y contraseña son requeridos'},
@@ -202,3 +205,18 @@ def dashboard_view(request):
         'ultimo_acceso': request.user.ultimo_acceso,
         'fecha_registro': request.user.fecha_registro
     })
+    
+    
+@api_view(['GET', 'PUT'])
+@permission_classes([IsAuthenticated])
+def user_profile(request):
+    user = request.user
+    if request.method == 'GET':
+        serializer = UserProfileSerializer(user)
+        return Response(serializer.data)
+    elif request.method == 'PUT':
+        serializer = UserProfileSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)

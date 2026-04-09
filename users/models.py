@@ -18,7 +18,33 @@ class CustomUser(AbstractUser):
     ultimo_acceso = models.DateTimeField(null=True, blank=True)
     intentos_fallidos = models.IntegerField(default=0)
     bloqueado_hasta = models.DateTimeField(null=True, blank=True)
-    
+
+    # Campos de perfilamiento para el entrenador virtual
+    training_goal = models.CharField(
+        max_length=20,
+        choices=[
+            ('hypertrophy', 'Hipertrofia'),
+            ('fat_loss', 'Pérdida grasa'),
+            ('endurance', 'Resistencia'),
+            ('maintenance', 'Mantenimiento'),
+        ],
+        blank=True,
+        null=True
+    )
+    days_per_week = models.PositiveSmallIntegerField(blank=True, null=True)
+    injuries = models.TextField(blank=True, null=True)
+    experience_level = models.CharField(
+        max_length=15,
+        choices=[
+            ('beginner', 'Principiante'),
+            ('intermediate', 'Intermedio'),
+            ('advanced', 'Avanzado'),
+        ],
+        blank=True,
+        null=True
+    )
+    session_duration = models.PositiveSmallIntegerField(blank=True, null=True)  # minutos
+
     def __str__(self):
         return f"{self.username} - {self.role}"
     
