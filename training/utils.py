@@ -1,13 +1,12 @@
-
+# training/utils.py
 from .models import Exercise, Routine, RoutineDetail
 
 def generar_rutina_inicial(user):
     """
-    Genera una rutina personalizada para el socio basada en su perfil.
-    Si ya tiene una rutina activa, no la reemplaza.
-    Retorna la rutina creada o la existente.
+    Genera una rutina personalizada completa de 4 semanas,
+    distribuida en los días que el socio seleccionó.
     """
-    # Verificar si el usuario ya tiene una rutina asignada
+    # Verificar si ya tiene rutina
     rutina_existente = Routine.objects.filter(user=user).first()
     if rutina_existente:
         return rutina_existente
@@ -17,84 +16,85 @@ def generar_rutina_inicial(user):
     goal = user.training_goal or 'hypertrophy'
     level = user.experience_level or 'beginner'
 
-    # Intentar obtener una plantilla por nombre (según nivel y objetivo)
-    # Si no existe, se creará directamente la rutina para el usuario sin plantilla.
-    template_name = None
-    if level == 'beginner':
-        template_name = 'Full Body Principiante' + (' (3d)' if days <= 3 else ' (4d)')
-    elif level == 'intermediate':
-        if goal == 'hypertrophy':
-            template_name = 'Push/Pull/Legs (4d)'
-        elif goal == 'fat_loss':
-            template_name = 'Upper/Lower + Cardio (4d)'
-        else:
-            template_name = 'Full Body Intermedio (3d)'
-    else:  # advanced
-        if goal == 'hypertrophy':
-            template_name = 'División Especializada (5d)'
-        else:
-            template_name = 'Push/Pull/Legs Avanzado (5d)'
-
-    # Buscar la plantilla (debe existir en la BD y tener un usuario asignado)
-    plantilla = None
-    if template_name:
-        plantilla = Routine.objects.filter(name=template_name, is_template=True).first()
-
-    if plantilla:
-        # Duplicar la plantilla para el usuario
-        rutina_usuario = Routine.objects.create(
-            name=f"{plantilla.name} - {user.username}",
-            description=plantilla.description,
-            duration_weeks=plantilla.duration_weeks,
-            days_per_week=plantilla.days_per_week,
-            user=user,
-            is_template=False
-        )
-        for detalle in plantilla.details.all():
-            RoutineDetail.objects.create(
-                routine=rutina_usuario,
-                exercise=detalle.exercise,
-                week=detalle.week,
-                day=detalle.day,
-                sets=detalle.sets,
-                reps=detalle.reps,
-                order=detalle.order,
-                rest_seconds=detalle.rest_seconds
-            )
-        return rutina_usuario
-    else:
-        # No existe plantilla: creamos una rutina personalizada directamente
-        return crear_rutina_personalizada(user, days, goal, level)
-
-
-def crear_rutina_personalizada(user, days, goal, level):
-    """Crea una rutina básica directamente para el usuario (sin usar plantillas)."""
+    # Crear la rutina base
     rutina = Routine.objects.create(
-        name=f"Rutina de {user.username}",
-        description=f"Rutina personalizada para {user.get_full_name() or user.username} basada en objetivo {goal} y nivel {level}",
+        name=f"Plan de {user.username}",
+        description=f"Rutina personalizada - Objetivo: {goal} - Nivel: {level} - {days} días/semana",
         duration_weeks=4,
         days_per_week=days,
         user=user,
         is_template=False
     )
 
-    # Obtener ejercicios (si no hay, crear unos de prueba)
-    ejercicios = Exercise.objects.all()
-    if not ejercicios.exists():
+    # Obtener ejercicios (o crearlos si no existen)
+    ejercicios = list(Exercise.objects.all())
+    if not ejercicios:
         ejercicios = crear_ejercicios_prueba()
 
-    # Asignar ejercicios a la rutina (todos al día 1 de la semana 1 por simplicidad)
-    for i, ejercicio in enumerate(ejercicios[:6], start=1):
-        RoutineDetail.objects.create(
-            routine=rutina,
-            exercise=ejercicio,
-            week=1,
-            day=1,
-            sets=3,
-            reps=12,
-            order=i,
-            rest_seconds=60
-        )
+    # Determinar días de entrenamiento (1=lunes, 2=martes, ..., 7=domingo)
+    # Usamos los primeros 'days' días de la semana
+    training_days = list(range(1, days + 1))
+
+    # Distribución profesional según nivel y objetivo
+    if level == 'beginner':
+        # Principiante: FULL BODY (mismos ejercicios todos los días)
+        for day in training_days:
+            for i, ej in enumerate(ejercicios[:6], start=1):
+                RoutineDetail.objects.create(
+                    routine=rutina,
+                    exercise=ej,
+                    week=1,
+                    day=day,
+                    sets=3,
+                    reps=12,
+                    order=i,
+                    rest_seconds=60
+                )
+
+    elif level == 'intermediate':
+        # Intermedio: Push/Pull/Legs (distribución por tipo de día)
+        # Necesitamos clasificar los ejercicios por grupo muscular
+        push = [ej for ej in ejercicios if ej.muscle_group in ['chest', 'shoulders']]
+        pull = [ej for ej in ejercicios if ej.muscle_group in ['back']]
+        legs = [ej for ej in ejercicios if ej.muscle_group == 'legs']
+        
+        # Si no hay suficientes, completamos con los primeros ejercicios
+        if len(push) < 3: push = ejercicios[:3]
+        if len(pull) < 3: pull = ejercicios[:3]
+        if len(legs) < 3: legs = ejercicios[:3]
+        
+        # Asignar según el día (patrón Push/Pull/Legs)
+        day_pattern = {1: push, 2: pull, 3: legs}
+        for day in training_days:
+            exercises = day_pattern.get(day, push)
+            for i, ej in enumerate(exercises[:4], start=1):
+                RoutineDetail.objects.create(
+                    routine=rutina,
+                    exercise=ej,
+                    week=1,
+                    day=day,
+                    sets=4,
+                    reps=10,
+                    order=i,
+                    rest_seconds=75
+                )
+
+    else:  # advanced
+        # Avanzado: Mayor volumen y ejercicios más complejos
+        # Usamos los primeros 6 ejercicios para todos los días
+        for day in training_days:
+            for i, ej in enumerate(ejercicios[:8], start=1):
+                RoutineDetail.objects.create(
+                    routine=rutina,
+                    exercise=ej,
+                    week=1,
+                    day=day,
+                    sets=4,
+                    reps=8,
+                    order=i,
+                    rest_seconds=90
+                )
+
     return rutina
 
 
@@ -107,6 +107,8 @@ def crear_ejercicios_prueba():
         {"name": "Press militar", "muscle_group": "shoulders", "difficulty": 2, "machine_required": "Barra o mancuernas"},
         {"name": "Curl de bíceps", "muscle_group": "arms", "difficulty": 1, "machine_required": "Mancuernas"},
         {"name": "Plancha", "muscle_group": "core", "difficulty": 1, "machine_required": ""},
+        {"name": "Peso muerto", "muscle_group": "legs", "difficulty": 3, "machine_required": "Barra"},
+        {"name": "Jalón al pecho", "muscle_group": "back", "difficulty": 2, "machine_required": "Polea alta"},
     ]
     ejercicios = []
     for data in ejercicios_data:

@@ -7,6 +7,9 @@ from .serializers import RoutineDetailSerializer, WorkoutLogSerializer
 from django.utils import timezone
 from datetime import datetime
 from .models import Routine, RoutineDetail, WorkoutLog
+from django.utils import timezone
+from datetime import datetime, timedelta
+from .models import ExerciseCompletion
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -35,7 +38,7 @@ def rutina_hoy(request):
 def registrar_entreno(request):
     user = request.user
     data = request.data
-    # data espera: {'difficulty': 'moderate', 'notes': '...', 'actual_weights': {'press_banca': 50}}
+    
     log = WorkoutLog.objects.create(
         user=user,
         completed=True,
@@ -44,3 +47,69 @@ def registrar_entreno(request):
         actual_weights=data.get('actual_weights', {})
     )
     return Response({'message': 'Entreno registrado'})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def completion_history(request):
+    user = request.user
+    start_date = request.query_params.get('start')
+    end_date = request.query_params.get('end')
+    
+    if not start_date:
+        start_date = (timezone.now() - timedelta(days=30)).date()
+    else:
+        start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+    
+    if not end_date:
+        end_date = timezone.now().date()
+    else:
+        end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+    
+    completions = ExerciseCompletion.objects.filter(
+        user=user,
+        date__range=[start_date, end_date]
+    ).select_related('exercise').order_by('-date', 'exercise__name')
+    
+    data = []
+    for c in completions:
+        data.append({
+            'date': c.date.isoformat(),
+            'exercise_id': c.exercise.id,
+            'exercise_name': c.exercise.name,
+            'completed': c.completed
+        })
+    return Response(data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def reset_completion(request):
+    user = request.user
+    exercise_id = request.data.get('exercise_id')
+    date_str = request.data.get('date')
+    
+    if not date_str:
+        date = timezone.now().date()
+    else:
+        date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    
+    if exercise_id:
+        
+        try:
+            exercise = Exercise.objects.get(id=exercise_id)
+        except Exercise.DoesNotExist:
+            return Response({'error': 'Ejercicio no encontrado'}, status=404)
+        
+        completion, _ = ExerciseCompletion.objects.get_or_create(
+            user=user, date=date, exercise=exercise,
+            defaults={'completed': False}
+        )
+        completion.completed = False
+        completion.save()
+        return Response({'message': f'Ejercicio {exercise.name} reiniciado'})
+    else:
+        
+        completions = ExerciseCompletion.objects.filter(user=user, date=date)
+        count = completions.update(completed=False)
+        return Response({'message': f'Se reiniciaron {count} ejercicios del día {date}'})
+

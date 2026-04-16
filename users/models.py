@@ -4,16 +4,16 @@ from django.utils import timezone
 
 class CustomUser(AbstractUser):
     ROLES = (
-        ('superadmin', 'Superadmin'),
-        ('admin', 'Admin'),
-        ('recepcionista', 'Recepcionista'),
-        ('entrenador', 'Entrenador'),
-        ('socio', 'Socio'),
+        ("superadmin", "Superadmin"),
+        ("admin", "Admin"),
+        ("recepcionista", "Recepcionista"),
+        ("entrenador", "Entrenador"),
+        ("socio", "Socio"),
     )
-    
-    role = models.CharField(max_length=20, choices=ROLES, default='socio')
+
+    role = models.CharField(max_length=20, choices=ROLES, default="socio")
     telefono = models.CharField(max_length=15, blank=True, null=True)
-    foto_perfil = models.ImageField(upload_to='perfiles/', null=True, blank=True)
+    foto_perfil = models.ImageField(upload_to="perfiles/", null=True, blank=True)
     fecha_registro = models.DateTimeField(default=timezone.now)
     ultimo_acceso = models.DateTimeField(null=True, blank=True)
     intentos_fallidos = models.IntegerField(default=0)
@@ -23,37 +23,61 @@ class CustomUser(AbstractUser):
     training_goal = models.CharField(
         max_length=20,
         choices=[
-            ('hypertrophy', 'Hipertrofia'),
-            ('fat_loss', 'Pérdida grasa'),
-            ('endurance', 'Resistencia'),
-            ('maintenance', 'Mantenimiento'),
+            ("hypertrophy", "Hipertrofia"),
+            ("fat_loss", "Pérdida grasa"),
+            ("endurance", "Resistencia"),
+            ("maintenance", "Mantenimiento"),
         ],
         blank=True,
-        null=True
+        null=True,
     )
     days_per_week = models.PositiveSmallIntegerField(blank=True, null=True)
-    injuries = models.TextField(blank=True, null=True)
+    injuries = models.TextField(blank=True, null=True)  # ← este es el original (texto libre)
     experience_level = models.CharField(
         max_length=15,
         choices=[
-            ('beginner', 'Principiante'),
-            ('intermediate', 'Intermedio'),
-            ('advanced', 'Avanzado'),
+            ("beginner", "Principiante"),
+            ("intermediate", "Intermedio"),
+            ("advanced", "Avanzado"),
         ],
         blank=True,
-        null=True
+        null=True,
     )
-    session_duration = models.PositiveSmallIntegerField(blank=True, null=True)  # minutos
+    session_duration = models.PositiveSmallIntegerField(
+        blank=True, null=True
+    )  # minutos
+
+    # NUEVOS CAMPOS (datos personales y médicos)
+    GENDER_CHOICES = [
+        ("male", "Hombre"),
+        ("female", "Mujer"),
+        ("other", "Otro"),
+    ]
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True, null=True)
+    age = models.PositiveIntegerField(null=True, blank=True)
+    weight = models.FloatField(null=True, blank=True)  # kg
+    height = models.FloatField(null=True, blank=True)  # cm
+
+    # Lesiones estructuradas (reemplaza o complementa a 'injuries')
+    injuries_structured = models.CharField(
+        max_length=200, blank=True, null=True,
+        help_text="Valores separados por comas: knees,lower_back,shoulders,elbows,wrists,neck"
+    )
+    other_injuries = models.TextField(blank=True, null=True)
+
+    # Condiciones médicas y cirugías
+    medical_conditions = models.TextField(blank=True, null=True)
+    surgeries = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.username} - {self.role}"
-    
+
     def incrementar_intentos(self):
         self.intentos_fallidos += 1
         if self.intentos_fallidos >= 5:
             self.bloqueado_hasta = timezone.now() + timezone.timedelta(minutes=15)
         self.save()
-    
+
     def resetear_intentos(self):
         self.intentos_fallidos = 0
         self.bloqueado_hasta = None
