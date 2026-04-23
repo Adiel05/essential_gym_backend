@@ -21,9 +21,12 @@ class Exercise(models.Model):
     muscle_group = models.CharField(max_length=20, choices=MUSCLE_GROUPS)
     machine_required = models.CharField(
         max_length=100, blank=True, null=True
-    )  # máquina o "peso libre"
-    video_url = models.URLField(blank=True, null=True)
-    image_url = models.URLField(blank=True, null=True)  # imagen de referencia
+    ) 
+    gif_file = models.FileField(
+        upload_to='exercise_gifs/',
+        blank=True, null=True,
+        verbose_name="GIF explicativo"
+    )    
     difficulty = models.IntegerField(choices=DIFFICULTY_CHOICES, default=1)
     is_active = models.BooleanField(default=True)
 

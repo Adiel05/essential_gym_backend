@@ -10,6 +10,14 @@ from .models import Routine, RoutineDetail, WorkoutLog
 from django.utils import timezone
 from datetime import datetime, timedelta
 from .models import ExerciseCompletion
+from .serializers import RoutineDetailSerializer
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def rutina_hoy(request):
+    # ... tu código para obtener detalles
+    serializer = RoutineDetailSerializer(detalles, many=True)
+    return Response(serializer.data)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -80,36 +88,4 @@ def completion_history(request):
             'completed': c.completed
         })
     return Response(data)
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def reset_completion(request):
-    user = request.user
-    exercise_id = request.data.get('exercise_id')
-    date_str = request.data.get('date')
-    
-    if not date_str:
-        date = timezone.now().date()
-    else:
-        date = datetime.strptime(date_str, '%Y-%m-%d').date()
-    
-    if exercise_id:
-        
-        try:
-            exercise = Exercise.objects.get(id=exercise_id)
-        except Exercise.DoesNotExist:
-            return Response({'error': 'Ejercicio no encontrado'}, status=404)
-        
-        completion, _ = ExerciseCompletion.objects.get_or_create(
-            user=user, date=date, exercise=exercise,
-            defaults={'completed': False}
-        )
-        completion.completed = False
-        completion.save()
-        return Response({'message': f'Ejercicio {exercise.name} reiniciado'})
-    else:
-        
-        completions = ExerciseCompletion.objects.filter(user=user, date=date)
-        count = completions.update(completed=False)
-        return Response({'message': f'Se reiniciaron {count} ejercicios del día {date}'})
 
