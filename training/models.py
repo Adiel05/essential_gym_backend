@@ -1,3 +1,4 @@
+#training/models
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.conf import settings
@@ -56,6 +57,7 @@ class Routine(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    start_date = models.DateField(null=True, blank=True, help_text="Fecha de inicio de la rutina")
 
     def __str__(self):
         return f"{self.name} - {self.user.username}"
@@ -72,6 +74,7 @@ class RoutineDetail(models.Model):
     reps = models.IntegerField()
     order = models.IntegerField()
     rest_seconds = models.IntegerField(default=60)
+    suggested_weight = models.FloatField(null=True, blank=True, help_text="Peso sugerido en kg")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -97,8 +100,9 @@ class WorkoutLog(models.Model):
     )
     actual_weights = models.JSONField(
         default=dict, blank=True
-    )  # ej: {exercise_id: weight}
+    )  
     notes = models.TextField(blank=True)
+    reps_performed = models.JSONField(default=dict, blank=True, help_text="Repeticiones realizadas por ejercicio, ej: {exercise_id: 12}")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
