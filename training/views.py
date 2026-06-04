@@ -7,6 +7,7 @@ from datetime import datetime, date, timedelta
 from .models import Routine, RoutineDetail, WorkoutLog, Exercise, ExerciseCompletion
 from .serializers import RoutineDetailSerializer
 from .utils import generar_rutina_inicial
+from .models import CorrectionLog
 
 
 @api_view(["GET"])
@@ -94,7 +95,6 @@ def registrar_entreno(request):
         difficulty=data.get("difficulty"),
         notes=data.get("notes", ""),
         actual_weights=data.get("actual_weights", {}),
-        
     )
     return Response({"message": "Entreno registrado"})
 
@@ -249,3 +249,61 @@ def training_history(request):
             }
         )
     return Response(data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def log_correction(request):
+    user = request.user
+    data = request.data
+    CorrectionLog.objects.create(
+        user=user,
+        exercise_name=data.get("exercise_name"),
+        error_type=data.get("error_type"),
+        severity=data.get("severity", "medium"),
+        corrected=data.get("corrected", False),
+    )
+    return Response({"status": "ok"})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def correction_stats(request):
+    user = request.user
+    from django.db.models import Count
+
+    logs = (
+        CorrectionLog.objects.filter(user=user)
+        .values("date", "exercise_name")
+        .annotate(count=Count("id"))
+        .order_by("date")
+    )
+    return Response(list(logs))
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def exercise_instructions(request):
+    """Devuelve nombre, descripción e instrucciones de un ejercicio por nombre."""
+    name = request.query_params.get("name", "").strip()
+    if not name:
+        return Response({"error": "Falta el parámetro name"}, status=400)
+
+    try:
+        exercise = Exercise.objects.get(name__iexact=name, is_active=True)
+        return Response(
+            {
+                "id": exercise.id,
+                "name": exercise.name,
+                "description": exercise.description,
+                "muscle_group": exercise.muscle_group,
+                "difficulty": exercise.difficulty,
+                "gif_url": (
+                    request.build_absolute_uri(exercise.gif_file.url)
+                    if exercise.gif_file
+                    else None
+                ),
+            }
+        )
+    except Exercise.DoesNotExist:
+        return Response({"error": f"Ejercicio '{name}' no encontrado"}, status=404)

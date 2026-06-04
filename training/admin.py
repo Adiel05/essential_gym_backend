@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Exercise, Routine, RoutineDetail, WorkoutLog
+from .models import Exercise, Routine, RoutineDetail, WorkoutLog, CorrectionLog
 
 class ExerciseAdmin(admin.ModelAdmin):
     list_display = ('name', 'muscle_group', 'difficulty', 'preview_gif')
@@ -13,8 +13,15 @@ class ExerciseAdmin(admin.ModelAdmin):
             return format_html('<img src="{}" style="max-height: 100px;" />', obj.gif_file.url)
         return "Sin GIF"
     preview_gif.short_description = 'Vista previa'
+    
+class CorrectionLogAdmin(admin.ModelAdmin):
+    list_display = ('user', 'exercise_name', 'error_type', 'confidence', 'severity', 'corrected', 'timestamp')
+    list_filter = ('error_type', 'severity', 'corrected')
+    search_fields = ('user__username', 'exercise_name')
+    ordering = ('-timestamp',)
 
 admin.site.register(Exercise, ExerciseAdmin)
 admin.site.register(Routine)
 admin.site.register(RoutineDetail)
 admin.site.register(WorkoutLog)
+admin.site.register(CorrectionLog)

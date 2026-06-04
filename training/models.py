@@ -1,7 +1,7 @@
-#training/models
+# essential_gym_backend/training/models.py
+from django.conf import settings
 from django.db import models
 from django.contrib.auth import get_user_model
-from django.conf import settings
 
 User = get_user_model()
 
@@ -20,17 +20,15 @@ class Exercise(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     muscle_group = models.CharField(max_length=20, choices=MUSCLE_GROUPS)
-    machine_required = models.CharField(
-        max_length=100, blank=True, null=True
-    ) 
+    machine_required = models.CharField(max_length=100, blank=True, null=True)
     gif_file = models.FileField(
-        upload_to='exercise_gifs/',
-        blank=True, null=True,
-        verbose_name="GIF explicativo"
-    )    
+        upload_to="exercise_gifs/",
+        blank=True,
+        null=True,
+        verbose_name="GIF explicativo",
+    )
     difficulty = models.IntegerField(choices=DIFFICULTY_CHOICES, default=1)
     is_active = models.BooleanField(default=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -52,12 +50,14 @@ class Routine(models.Model):
         related_name="created_routines",
     )
     is_template = models.BooleanField(
-        default=False, help_text="Si es plantilla para usar con múltiples usuarios"
+        default=False,
+        help_text="Si es plantilla para usar con múltiples usuarios",
     )
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    start_date = models.DateField(null=True, blank=True, help_text="Fecha de inicio de la rutina")
+    start_date = models.DateField(
+        null=True, blank=True, help_text="Fecha de inicio de la rutina"
+    )
 
     def __str__(self):
         return f"{self.name} - {self.user.username}"
@@ -68,14 +68,15 @@ class RoutineDetail(models.Model):
         Routine, on_delete=models.CASCADE, related_name="details"
     )
     exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE)
-    week = models.IntegerField()  # 1..duration_weeks
-    day = models.IntegerField()  # 1..7
+    week = models.IntegerField()
+    day = models.IntegerField()
     sets = models.IntegerField()
     reps = models.IntegerField()
     order = models.IntegerField()
     rest_seconds = models.IntegerField(default=60)
-    suggested_weight = models.FloatField(null=True, blank=True, help_text="Peso sugerido en kg")
-
+    suggested_weight = models.FloatField(
+        null=True, blank=True, help_text="Peso sugerido en kg"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -89,7 +90,6 @@ class WorkoutLog(models.Model):
         ("moderate", "Moderado"),
         ("hard", "Difícil"),
     ]
-
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="workout_logs"
     )
@@ -98,18 +98,18 @@ class WorkoutLog(models.Model):
     difficulty = models.CharField(
         max_length=10, choices=DIFFICULTY_CHOICES, blank=True, null=True
     )
-    actual_weights = models.JSONField(
-        default=dict, blank=True
-    )  
+    actual_weights = models.JSONField(default=dict, blank=True)
     notes = models.TextField(blank=True)
-    reps_performed = models.JSONField(default=dict, blank=True, help_text="Repeticiones realizadas por ejercicio, ej: {exercise_id: 12}")
-
+    reps_performed = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Repeticiones realizadas por ejercicio",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.user.username} - {self.date}"
-
 
 
 class ExerciseCompletion(models.Model):
@@ -119,7 +119,48 @@ class ExerciseCompletion(models.Model):
     completed = models.BooleanField(default=False)
 
     class Meta:
-        unique_together = ("user", "date", "exercise")  
+        unique_together = ("user", "date", "exercise")
 
     def __str__(self):
-        return f"{self.user.username} - {self.exercise.name} - {self.date} - {'✅' if self.completed else '❌'}"
+        return f"{self.user.username} - {self.exercise.name} - {self.date}"
+
+
+# ── CorrectionLog unificado ────────────────────────────────
+# Fusión del modelo original + campos de IA
+class CorrectionLog(models.Model):
+    SEVERITY_CHOICES = [
+        ("low", "Baja"),
+        ("medium", "Media"),
+        ("high", "Alta"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="correction_logs",
+    )
+    exercise_name = models.CharField(max_length=100)
+    error_type    = models.CharField(max_length=100)
+    severity      = models.CharField(
+        max_length=20, choices=SEVERITY_CHOICES, default="medium"
+    )
+    corrected     = models.BooleanField(default=False)
+
+    # Campos de IA (nuevos)
+    confidence    = models.FloatField(default=0.0)
+    angles        = models.JSONField(null=True, blank=True)
+
+    # Timestamps (usamos timestamp del original, agregamos created_at como alias)
+    timestamp     = models.DateTimeField(auto_now_add=True)
+    date          = models.DateField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-timestamp"]
+
+    def __str__(self):
+        return f"{self.user} | {self.exercise_name} | {self.error_type}"
+
+    # Propiedad para que views_ia.py pueda usar .created_at sin romper nada
+    @property
+    def created_at(self):
+        return self.timestamp
